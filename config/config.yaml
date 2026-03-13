@@ -1,0 +1,58 @@
+# A股历史数据获取系统配置
+
+data:
+  # 数据存储根目录（使用相对路径，兼容云主机迁移）
+  root_dir: "data"
+  archive_dir: "archive"
+  backup_dir: "backup"
+  
+  # 数据级别及保留天数
+  # 15m为基础数据，30m/60m/120m/daily通过15m聚合计算
+  levels:
+    15m:
+      days: 32
+      filename: "15m.csv"
+    30m:
+      days: 32
+      filename: "30m.csv"
+    60m:
+      days: 32
+      filename: "60m.csv"
+    120m:
+      days: 32
+      filename: "120m.csv"
+    daily:
+      days: 99999
+      filename: "daily.csv"
+
+fetcher:
+  # 每日运行时间（HH:MM）
+  run_time: "17:00"
+  
+  # 初始化设置
+  init:
+    batch_size: 100      # 每批股票数量
+    batch_interval: 300  # 批次间隔（秒）
+  
+  # 日常运行设置
+  daily:
+    retry_times: 2       # 失败重试次数
+    request_interval: 0.5 # 请求间隔（秒）
+  
+  # 数据校验
+  validate:
+    # 各级别预期条数范围 (min, max)
+    15m: [14, 18]
+    30m: [8, 10]
+    60m: [4, 5]
+    120m: [2, 3]
+    daily: [1, 1]
+
+logging:
+  level: "INFO"
+  file: "logs/fetcher.log"
+  max_bytes: 10485760   # 10MB
+  backup_count: 5
+
+status:
+  file: "status.json"
