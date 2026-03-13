@@ -59,6 +59,12 @@ class AStockRunner:
         logger.info("初始化完成！")
 
     def run_daily(self) -> None:
+        from .utils import is_trading_day
+        today = datetime.now().strftime("%Y-%m-%d")
+        if not is_trading_day(today):
+            logger.info(f"今日 {today} 非交易日，跳过增量更新")
+            return
+
         start_time = time.time()
         
         from src.health_check import notify_start, check_offline_alert
