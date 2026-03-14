@@ -3,7 +3,19 @@ from typing import Optional
 
 
 class DataAggregator:
+    """数据聚合器：将15m数据聚合为更高周期"""
+
     def aggregate_15m_to_higher(self, df: pd.DataFrame, target_period: str) -> pd.DataFrame:
+        """
+        将15分钟数据聚合为更高周期
+
+        Args:
+            df: 15分钟数据
+            target_period: 目标周期 (30m/60m/120m/daily)
+
+        Returns:
+            聚合后的数据
+        """
         if df is None or df.empty:
             return df
 
@@ -11,6 +23,7 @@ class DataAggregator:
         df["timestamp"] = pd.to_datetime(df["timestamp"])
         df = df.sort_values("timestamp")
 
+        # 周期映射
         if target_period == "30m":
             freq = "30min"
         elif target_period == "60m":
@@ -22,6 +35,7 @@ class DataAggregator:
         else:
             return df
 
+        # 聚合：收盘价取最后一个，成交量求和
         df = df.set_index("timestamp")
         agg_df = df.resample(freq).agg({
             "close": "last",

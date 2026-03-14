@@ -14,11 +14,18 @@ from .health_check import notify_start, notify_complete, notify_error
 
 
 class AStockRunner:
+    """A股数据获取主程序"""
+
     def __init__(self):
         self.levels = list(config.levels.keys())
         self.status = load_status()
 
     def run_init(self) -> None:
+        """
+        初始化数据库：获取全部A股的历史数据
+
+        分批获取，每批100只，间隔5分钟，避免API限流
+        """
         logger.info("=" * 50)
         logger.info("开始初始化数据库...")
         logger.info("=" * 50)
@@ -46,11 +53,13 @@ class AStockRunner:
                 if not symbol:
                     continue
 
+                # 跳过已存在的股票
                 if symbol in existing_stocks:
                     continue
 
                 self._fetch_all_levels(symbol)
 
+            # 每批完成后休眠，避免API限流
             if i + batch_size < len(stock_list):
                 logger.info(f"批次完成，休眠 {batch_interval} 秒...")
                 time.sleep(batch_interval)
@@ -59,6 +68,17 @@ class AStockRunner:
         logger.info("初始化完成！")
 
     def run_daily(self) -> None:
+        """
+        每日增量更新主流程
+
+        步骤：
+        1. 检查是否为交易日
+        2. 检查新股/退市股
+        3. 获取增量数据
+        4. 检查数据完整性（已跳过）
+        5. 清理过期数据
+        6. 备份数据
+        """
         from .utils import is_trading_day
         today = datetime.now().strftime("%Y-%m-%d")
         if not is_trading_day(today):
@@ -83,13 +103,16 @@ class AStockRunner:
         existing_stocks = set(storage.get_existing_stocks())
         current_stocks = {s for s in (self._normalize_symbol(s.get("code", "")) for s in stock_list) if s}
 
+        # 识别新股和退市股票
         new_stocks = current_stocks - existing_stocks
         removed_stocks = existing_stocks - current_stocks
 
+        # 获取新股数据
         for symbol in new_stocks:
             logger.info(f"新股: {symbol}")
             self._fetch_all_levels(symbol)
 
+        # 退市股票移至归档
         for symbol in removed_stocks:
             logger.info(f"退市: {symbol}，移至归档")
             storage.archive_stock(symbol)
@@ -101,6 +124,7 @@ class AStockRunner:
         fail_list = []
         success_count = 0
 
+        # 大批量处理，每批2000只，间隔5分钟
         batch_size = 2000
         batch_interval = 300  # 5分钟
         
@@ -121,6 +145,7 @@ class AStockRunner:
                 else:
                     fail_list.append(symbol)
             
+            # 每批完成后休眠
             if i + batch_size < len(stock_symbols):
                 logger.info(f"批次完成，休眠 {batch_interval} 秒...")
                 time.sleep(batch_interval)
@@ -324,6 +349,17 @@ class AStockRunner:
         logger.info("补全完成！")
 
     def _fetch_all_levels(self, symbol: str) -> bool:
+        """
+        获取股票所有级别的数据
+
+        15m为基础数据，增量获取；其他级别从15m聚合生成
+
+        Args:
+            symbol: 股票代码
+
+        Returns:
+            是否成功
+        """
         today = datetime.now().strftime("%Y%m%d")
         all_success = True
 
@@ -344,6 +380,15 @@ class AStockRunner:
         return all_success
 
     def _generate_aggregated_levels(self, symbol: str) -> bool:
+        """
+        从15m数据聚合生成更高周期的数据
+
+        Args:
+            symbol: 股票代码
+
+        Returns:
+            是否成功
+        """
         from .aggregator import aggregator
 
         base_df = storage.read_data(symbol, "15m")
@@ -366,6 +411,19 @@ class AStockRunner:
         end_date: str = None,
         days: int = None
     ) -> bool:
+        """
+        获取并更新股票数据
+
+        Args:
+            symbol: 股票代码
+            level: 数据级别
+            start_date: 开始日期
+            end_date: 结束日期
+            days: 获取最近N天数据
+
+        Returns:
+            是否成功
+        """
         try:
             df = fetcher.fetch_hist_data(
                 symbol=symbol,
@@ -379,9 +437,11 @@ class AStockRunner:
                 logger.warning(f"{symbol} {level}: 无数据")
                 return False
 
+            # 数据校验（条数范围检查）
             if not fetcher.validate_data(df, level):
                 logger.warning(f"{symbol} {level}: 数据校验失败，条数 {len(df)}")
 
+            # 数据清洗后写入存储
             df = cleaner.clean(df)
             storage.write_data(symbol, level, df, mode="append")
 
@@ -392,7 +452,21 @@ class AStockRunner:
             logger.error(f"{symbol} {level}: 获取失败 - {e}")
             return False
 
-    def _normalize_symbol(self, code: str) -> str:
+    def _normalize_symbol(self, code: str) -> Optional[str]:
+        """
+        标准化股票代码
+
+        规则：
+        - 6开头 -> 上海A股 (SH)
+        - 0/3开头 -> 深圳A股 (SZ)
+        - 8/9开头 -> 北交所/上海B股，不获取
+
+        Args:
+            code: 原始股票代码
+
+        Returns:
+            标准化后的代码，或None（不获取）
+        """
         code = code.strip()
         if code.startswith("6"):
             return f"SH{code}"

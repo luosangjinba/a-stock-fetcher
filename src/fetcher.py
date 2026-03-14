@@ -9,11 +9,19 @@ from .utils import logger, rate_limit
 
 
 class StockFetcher:
+    """A股历史数据获取器"""
+
     def __init__(self):
         self.request_interval = config.request_interval
         self.validate_rules = config.validate_rules
 
     def fetch_stock_list(self) -> List[Dict[str, str]]:
+        """
+        获取A股股票列表
+
+        Returns:
+            股票列表，每只股票包含code和name字段
+        """
         logger.info("获取股票列表...")
         try:
             df = ak.stock_info_a_code_name()
@@ -25,6 +33,16 @@ class StockFetcher:
             raise
 
     def _get_date_range(self, period: str, days: int) -> tuple:
+        """
+        计算日期范围
+
+        Args:
+            period: 数据周期
+            days: 向前天数
+
+        Returns:
+            (开始日期, 结束日期) 格式为YYYYMMDD
+        """
         end_date = datetime.now().strftime("%Y%m%d")
         start_date = (datetime.now() - timedelta(days=days)).strftime("%Y%m%d")
         return start_date, end_date
@@ -88,6 +106,7 @@ class StockFetcher:
             if df is None or df.empty:
                 return None
 
+            # 统一列名：日期列转为timestamp，收盘价转为close，成交量转为volume
             if akshare_period == "daily":
                 if "日期" not in df.columns:
                     return None
@@ -105,6 +124,7 @@ class StockFetcher:
                     "成交量": "volume"
                 })
 
+            # 只保留需要的列，并转换为正确的数据类型
             df = df[["timestamp", "close", "volume"]]
             df = df.dropna(subset=["close"])
             df["close"] = df["close"].astype(float)
@@ -117,6 +137,16 @@ class StockFetcher:
             return None
 
     def validate_data(self, df: pd.DataFrame, period: str) -> bool:
+        """
+        校验数据条数是否在预期范围内
+
+        Args:
+            df: 待校验的数据
+            period: 数据周期
+
+        Returns:
+            是否通过校验
+        """
         if df is None or df.empty:
             return False
 
