@@ -65,6 +65,19 @@ chmod +x deploy.sh && ./deploy.sh
 pip3 install -r requirements.txt
 ```
 
+### 一键部署功能
+
+`deploy.sh` 脚本会自动完成以下操作：
+
+| 步骤 | 说明 |
+|------|------|
+| 1 | 创建目录结构（data, archive, backup, logs） |
+| 2 | 安装Python依赖 |
+| 3 | 配置Telegram通知（可选） |
+| 4 | 初始化数据库（可选） |
+| 5 | 设置定时任务cron（可选） |
+| 6 | 验证依赖安装 |
+
 ## 使用方法
 
 ### 命令行模式
