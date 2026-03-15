@@ -10,7 +10,7 @@ from .fetcher import fetcher
 from .storage import storage
 from .cleaner import cleaner
 from .utils import logger, load_status, save_status, get_last_trading_day
-from .health_check import notify_start, notify_complete, notify_error
+from .health_check import notify_start, notify_complete, notify_error, notify_batch_complete
 
 
 class AStockRunner:
@@ -137,6 +137,8 @@ class AStockRunner:
             batch = stock_symbols[i:i + batch_size]
             batch_num = i // batch_size + 1
             
+            batch_start_time = time.time()  # 批次开始时间
+            
             logger.info(f"处理批次 {batch_num}/{total_batches} ({len(batch)}只股票)")
             
             for symbol in batch:
@@ -144,6 +146,10 @@ class AStockRunner:
                     success_count += 1
                 else:
                     fail_list.append(symbol)
+            
+            # 批次完成通知
+            batch_duration = int(time.time() - batch_start_time)
+            notify_batch_complete(batch_num, total_batches, success_count, len(fail_list), batch_duration)
             
             # 每批完成后休眠
             if i + batch_size < len(stock_symbols):

@@ -1,3 +1,12 @@
+"""
+A股数据健康检查模块
+
+功能：
+- 宕机告警：超过3天未运行则Telegram告警
+- 健康检查：检查各股票数据完整性
+- 通知：Telegram发送状态报告
+"""
+
 import sys
 import os
 import json
@@ -10,13 +19,23 @@ from src.config import config
 from src.utils import logger, save_status, load_status
 
 
+# Telegram配置（从环境变量读取）
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 TELEGRAM_CHAT_ID = os.environ.get("TELEGRAM_CHAT_ID", "")
 
+# 离线告警阈值（天）
 OFFLINE_THRESHOLD_DAYS = 3
 
 
 def check_offline_alert() -> bool:
+    """
+    检查是否需要发送宕机告警
+    
+    检查上次成功运行距今是否超过阈值，超过则发送Telegram告警
+    
+    Returns:
+        是否触发告警
+    """
     status = load_status()
     last_success = status.get("last_success", "")
     
@@ -40,7 +59,17 @@ def check_offline_alert() -> bool:
     logger.info(f"上次成功运行: {last_success} ({days_offline} 天前)")
     return False
 
+
 def send_telegram(message: str) -> bool:
+    """
+    发送Telegram消息
+    
+    Args:
+        message: 要发送的消息内容
+        
+    Returns:
+        是否发送成功
+    """
     if not TELEGRAM_TOKEN or not TELEGRAM_CHAT_ID:
         print("Telegram通知未配置 (TELEGRAM_TOKEN/TELEGRAM_CHAT_ID)")
         return False
@@ -56,10 +85,21 @@ def send_telegram(message: str) -> bool:
 
 
 def notify_start():
+    """发送增量更新开始通知"""
     send_telegram("🚀 A股数据增量更新已开始")
 
 
 def notify_complete(duration_seconds: int, success_count: int, fail_count: int, new_count: int, removed_count: int):
+    """
+    发送增量更新完成通知
+    
+    Args:
+        duration_seconds: 运行时长（秒）
+        success_count: 成功获取的股票数
+        fail_count: 获取失败的股票数
+        new_count: 新股数量
+        removed_count: 退市数量
+    """
     minutes = duration_seconds // 60
     seconds = duration_seconds % 60
     
@@ -75,7 +115,36 @@ def notify_complete(duration_seconds: int, success_count: int, fail_count: int, 
 
 
 def notify_error(message: str):
+    """
+    发送错误通知
+    
+    Args:
+        message: 错误消息
+    """
     send_telegram(f"❌ 错误: {message}")
+
+
+def notify_batch_complete(batch_num: int, total_batches: int, success_count: int, fail_count: int, duration_seconds: int):
+    """
+    发送批次完成通知
+    
+    Args:
+        batch_num: 当前批次号
+        total_batches: 总批次数
+        success_count: 成功数
+        fail_count: 失败数
+        duration_seconds: 运行时长(秒)
+    """
+    minutes = duration_seconds // 60
+    seconds = duration_seconds % 60
+    
+    lines = [
+        f"📊 批次 {batch_num}/{total_batches} 完成",
+        f"⏱️ 耗时: {minutes}分{seconds}秒",
+        f"✅ 成功: {success_count}",
+        f"❌ 失败: {fail_count}"
+    ]
+    send_telegram("\n".join(lines))
 
 
 def main():

@@ -34,10 +34,6 @@ class DataStorage:
         stock_dir = self.root_dir / symbol
         stock_dir.mkdir(parents=True, exist_ok=True)
         return stock_dir / level_filename
-        level_filename = config.get_level_filename(level)
-        stock_dir = self.root_dir / symbol
-        stock_dir.mkdir(parents=True, exist_ok=True)
-        return stock_dir / level_filename
 
     def read_data(self, symbol: str, level: str) -> Optional[pd.DataFrame]:
         """
