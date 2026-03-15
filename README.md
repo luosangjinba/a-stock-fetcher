@@ -58,6 +58,10 @@ a-stock-fetcher/
 ## 安装
 
 ```bash
+# 一键部署（推荐）
+chmod +x deploy.sh && ./deploy.sh
+
+# 手动安装
 pip3 install -r requirements.txt
 ```
 
