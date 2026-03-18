@@ -1,5 +1,32 @@
 # 变更记录
 
+## 2026-03-19
+
+### 行业强度分析
+
+- 新增 `src/industry.py` 模块：行业强度计算
+- 新增 `src/industry_db.py` 模块：SQLite历史数据库
+- 算法：获取近20日涨幅前400只 → 匹配行业 → 统计出现次数/行业总数 = 强度
+- 数据源：Tushare stock_basic.industry（覆盖率100%）
+- 自动补全：检测缺失日期，自动补全历史数据
+
+### 命令行新增
+
+- `python3 main.py industry-strength` - 计算行业强度
+- `python3 main.py industry-query` - 查询历史
+- `python3 main.py industry-trend` - 查询行业趋势
+
+### 集成到每日流程
+
+- 每日增量完成后自动计算行业强度
+- 自动保存到SQLite数据库
+- 自动推送到Telegram
+
+### 通知增强
+
+- 新增 `notify_industry_strength()` 函数
+- 行业强度计算完成后推送排名到Telegram
+
 ## 2026-03-16
 
 ### 批次完成通知

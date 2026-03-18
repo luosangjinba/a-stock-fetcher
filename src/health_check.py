@@ -147,6 +147,33 @@ def notify_batch_complete(batch_num: int, total_batches: int, success_count: int
     send_telegram("\n".join(lines))
 
 
+def notify_industry_strength(results: list, filled_dates: list = None):
+    """
+    发送行业强度排名通知
+    
+    Args:
+        results: 行业强度结果列表
+        filled_dates: 补全的日期列表
+    """
+    if not results:
+        return
+    
+    lines = [
+        "📈 行业强度排名",
+        f"📅 {datetime.now().strftime('%Y-%m-%d')}",
+        ""
+    ]
+    
+    if filled_dates:
+        lines.append(f"🔄 补全日期: {', '.join(filled_dates)}")
+        lines.append("")
+    
+    for r in results[:12]:
+        lines.append(f"{r['rank']:>2}. {r['industry_name']:<10} {r['strength']:>5.1f}%")
+    
+    send_telegram("\n".join(lines))
+
+
 def main():
     print("开始数据健康检查...")
 

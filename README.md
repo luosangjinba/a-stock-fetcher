@@ -13,7 +13,8 @@
 - **滚动清理**：自动剔除过期数据
 - **自动备份**：每次运行后自动备份
 - **定时调度**：支持每日自动执行
-- **Telegram通知**：增量更新开始/完成/异常通知
+- **Telegram通知**：增量更新开始/完成/异常/行业强度通知
+- **行业强度分析**：每日自动计算行业强度排名，支持历史查询
 
 ## 数据存储
 
@@ -48,7 +49,9 @@ a-stock-fetcher/
 │   ├── cleaner.py           # 数据清洗
 │   ├── aggregator.py        # 数据聚合
 │   ├── runner.py            # 主程序
-│   ├── health_check.py      # 数据健康检查
+│   ├── health_check.py      # 数据健康检查+Telegram通知
+│   ├── industry.py          # 行业强度计算
+│   ├── industry_db.py        # 行业强度数据库
 │   └── utils.py            # 工具函数
 ├── main.py                  # 命令行入口
 ├── requirements.txt        # 依赖
@@ -86,7 +89,7 @@ pip3 install -r requirements.txt
 # 初始化数据库（首次运行，每批100只，间隔5分钟）
 python3 main.py init
 
-# 每日增量更新（自动跳过非交易日）
+# 每日增量更新（自动跳过非交易日，包含行业强度计算）
 python3 main.py daily
 
 # 补全缺失数据（如漏跑某天）
@@ -97,6 +100,15 @@ python3 main.py check-suspended
 
 # 数据健康检查（检查完整性并发送Telegram报告）
 python3 main.py health_check
+
+# 行业强度排名（手动计算并保存到数据库）
+python3 main.py industry-strength
+
+# 查询行业强度历史
+python3 main.py industry-query
+
+# 查询行业趋势
+python3 main.py industry-trend --industry "电气设备"
 ```
 
 ### Telegram通知
@@ -109,6 +121,7 @@ python3 main.py health_check
 | 开始时 | 🚀 开始更新 | 每日增量启动 |
 | 批次完成 | 📊 批次 X/Y 完成 | 每批处理完推送，含耗时/成功/失败 |
 | 完成时 | ✅ 更新完成 | 含耗时/成功/失败/新股/退市 |
+| 行业强度 | 📈 行业强度排名 | 每日行业强度前12名 |
 | 异常时 | ❌ 错误告警 | 失败数>100 |
 
 ### 定时任务（cron）
@@ -149,11 +162,12 @@ python3 fix_negative.py
 | 3 | 新股全量获取 | 新股获取全部可用历史（~32个交易日） |
 | 4 | 退市归档 | 退市股票移至 `archive/` 目录 |
 | 5 | 增量获取 | 现有股票只获取当日数据（约16条15m） |
-| 6 | 数据清洗 | 去重、排序、前向填充、过滤0价格 |
+| 6 | 数据清洗 | 去重、排序，前向填充，过滤0价格 |
 | 7 | 聚合生成 | 从15m实时聚合30m/60m/120m/daily |
 | 8 | 降采样 | 分钟级保留512行，日线永久保留 |
 | 9 | 备份 | 压缩包存至 `backup/` 目录 |
-| 10 | Telegram通知 | 发送开始/完成/异常消息 |
+| 10 | 行业强度 | 计算当日行业强度，保存数据库，推送Telegram |
+| 11 | Telegram通知 | 发送开始/完成/异常消息 |
 
 **数据流**：
 ```
@@ -197,6 +211,13 @@ fetcher:
     batch_interval: 300    # 每日增量批次间隔(秒)
     retry_times: 2           # 重试次数
     request_interval: 0.5  # 请求间隔(秒)
+
+industry:
+  # token从环境变量 TUSHARE_TOKEN 读取
+  analysis:
+    lookback_days: 20      # 近N日涨幅统计
+    top_stocks: 400        # 取涨幅前N只股票
+    output_top: 12         # 输出前N个行业
 ```
 
 ## 数据级别说明
@@ -219,6 +240,74 @@ fetcher:
 - 8开头（北交所）、9开头（上海B股）不获取
 - 只获取：6开头（上交所）、0/3开头（深交所）A股
 - 价格已做前复权（qfq）处理
+
+## 行业强度分析
+
+### 算法说明
+
+每日收盘后自动计算行业强度排名：
+
+1. 获取近20日涨幅前400只股票
+2. 匹配股票所属行业（使用Tushare stock_basic.industry）
+3. 统计每个行业在400强中出现的次数
+4. 计算强度 = 出现次数 / 行业总股票数 × 100%
+5. 排序取前12名
+
+### 数据存储
+
+```
+data/
+├── industry/                 # 行业缓存
+│   ├── industries.json      # 行业列表
+│   ├── members.json         # 股票行业映射
+│   └── last_update.txt      # 最后更新时间
+└── industry_strength.db     # SQLite数据库（历史记录）
+```
+
+### 使用方式
+
+```bash
+# 手动计算行业强度
+python3 main.py industry-strength
+
+# 自定义参数
+python3 main.py industry-strength --days 20 --top 400 --output-top 12
+
+# 强制更新行业缓存
+python3 main.py industry-strength --force-update
+
+# 查询最新行业强度
+python3 main.py industry-query
+
+# 查询特定行业历史
+python3 main.py industry-query --industry "电气设备" --history-days 30
+
+# 查询行业趋势
+python3 main.py industry-trend --industry "电气设备"
+```
+
+### 行业强度查询示例
+
+```bash
+# 查看近5日强势行业
+python3 main.py industry-trend
+# 输出:
+# 近5日强势行业:
+#   石油贸易: 平均强度 50.00%
+#   新型电力: 平均强度 46.67%
+#   石油开采: 平均强度 38.10%
+```
+
+### 环境配置
+
+```bash
+# Tushare token（必需）
+export TUSHARE_TOKEN="your_token"
+
+# Telegram通知（可选）
+export TELEGRAM_TOKEN="your_bot_token"
+export TELEGRAM_CHAT_ID="your_chat_id"
+```
 
 ## API调用
 
@@ -308,3 +397,5 @@ python3 main.py fix-missing
 - pandas >= 2.0.0
 - pyyaml >= 6.0
 - python-dateutil >= 2.8.0
+- tushare >= 1.4.0
+- requests >= 2.25.0

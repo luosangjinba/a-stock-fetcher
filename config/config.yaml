@@ -56,3 +56,10 @@ logging:
 
 status:
   file: "status.json"
+
+# 行业强度分析配置
+industry:
+  analysis:
+    lookback_days: 20
+    top_stocks: 400
+    output_top: 12

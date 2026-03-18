@@ -68,19 +68,20 @@ def get_stock_list() -> List[Dict[str, str]]:
 
 def is_trading_day(date: Optional[str] = None) -> bool:
     """
-    判断是否为交易日
+    判断是否为交易日（周一到周五）
 
     Args:
         date: 日期字符串，默认今天
 
     Returns:
-        是否为交易日
+        是否为交易日（周一到周五）
     """
     if date is None:
-        date = datetime.now().strftime("%Y-%m-%d")
-    import akshare as ak
-    df = ak.tool_trade_date_hist_sina()
-    return date in df["trade_date"].values
+        check_date = datetime.now()
+    else:
+        check_date = datetime.strptime(date, "%Y-%m-%d")
+    # 周一到周五为交易日 (weekday: 0=周一, 4=周五)
+    return check_date.weekday() < 5
 
 
 def get_last_trading_day(date: Optional[str] = None) -> str:

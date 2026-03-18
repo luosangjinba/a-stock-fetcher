@@ -19,6 +19,7 @@ logs/
 # Environment (contains secrets)
 .env
 .env.local
+config/config.yaml  # 包含敏感token
 
 # IDE
 .idea/

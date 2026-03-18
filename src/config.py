@@ -98,6 +98,38 @@ class Config:
         self._load()
         return self._config["status"]["file"]
 
+    @property
+    def tushare_token(self) -> str:
+        """Token from env TUSHARE_TOKEN or ~/.tushare_token"""
+        self._load()
+        token = os.environ.get("TUSHARE_TOKEN", "").strip()
+        if token:
+            return token
+        
+        token_file = Path.home() / ".tushare_token"
+        if token_file.exists():
+            return token_file.read_text().strip()
+        
+        return ""
+
+    @property
+    def industry_lookback_days(self) -> int:
+        self._load()
+        ind_cfg = self._config.get("industry", {})
+        return ind_cfg.get("analysis", {}).get("lookback_days", 20)
+
+    @property
+    def industry_top_stocks(self) -> int:
+        self._load()
+        ind_cfg = self._config.get("industry", {})
+        return ind_cfg.get("analysis", {}).get("top_stocks", 400)
+
+    @property
+    def industry_output_top(self) -> int:
+        self._load()
+        ind_cfg = self._config.get("industry", {})
+        return ind_cfg.get("analysis", {}).get("output_top", 12)
+
     def get_level_days(self, level: str) -> int:
         """
         获取指定级别的数据保留天数
